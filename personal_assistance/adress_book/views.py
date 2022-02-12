@@ -1,5 +1,6 @@
-#from django.shortcuts import render
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.views import generic
+from django.views.generic.list import ListView
 from django.views.generic.edit import CreateView, UpdateView, DeleteView
 from django.urls import reverse_lazy
 from django.http import HttpResponseRedirect
@@ -10,36 +11,46 @@ import re
 from datetime import datetime, timedelta
 
 
-class ContactListView(generic.ListView):
+class ContactListView(LoginRequiredMixin, ListView):
     '''Allow us to generate list of contacts and pass it to 'contact_list.html'.'''
 
     model = Contact
     paginate_by = 40
 
+    def get_context_data(self, **kwargs):
+        """
+        Proceed context data in respect to authorised user
+        """
+        context = super().get_context_data(**kwargs)
+        context['all_records'] = Contact.objects.filter(author=self.request.user)
+        return context
 
-class ContactDetailView(generic.DetailView):
+
+class ContactDetailView(LoginRequiredMixin, generic.DetailView):
     '''Take id of the contact and show specified contact info.'''
 
     model = Contact
 
-class AddContact(CreateView):
+
+class AddContact(LoginRequiredMixin, CreateView):
     '''Generate form for user input and check if it is valid.'''
 
     model = Contact
-    fields = '__all__'
+    fields = ['name', 'address', 'email', 'phone', 'birthday']
     success_url = reverse_lazy('contacts')
 
     def form_valid(self, form):
         '''Check if phone number is valid, because field phone is 'charfield' and may contain a letter'''
 
         pattern = r'\d{12}'
+        form.instance.author = self.request.user
         if not re.fullmatch(pattern, form.cleaned_data['phone']):
             form.add_error('phone', 'Phone number should contain only digits')
             return self.form_invalid(form)
         return super(AddContact, self).form_valid(form)
 
 
-class UpdateContact(UpdateView):
+class UpdateContact(LoginRequiredMixin, UpdateView):
     '''Generate form for update user input and check if it is valid.'''
 
     model = Contact
@@ -55,8 +66,9 @@ class UpdateContact(UpdateView):
         return super(UpdateContact, self).form_valid(form)
 
 
-class DeleteContact(DeleteView):
-    '''Take value from input form and contact id. If it's cancel return to 'contacts' page or delete contact with this id otherwise.'''
+class DeleteContact(LoginRequiredMixin, DeleteView):
+    '''Take value from input form and contact id. If it's cancel return to
+    'contacts' page or delete contact with this id otherwise.'''
 
     model = Contact
     success_url = reverse_lazy('contacts')
@@ -69,13 +81,12 @@ class DeleteContact(DeleteView):
             return super(DeleteContact, self).post(request, *args, **kwargs)
 
 
-class SearchResultsView(generic.ListView):
+class SearchResultsView(LoginRequiredMixin, generic.ListView):
     '''Take query from input form and generate list of searched contacts.'''
 
     model = Contact
-    
- 
-    def get_queryset(self): 
+
+    def get_queryset(self):
         '''Take query and return suitable queryset'''
         query = self.request.GET.get('q')
         object_list = Contact.objects.filter(
@@ -84,13 +95,13 @@ class SearchResultsView(generic.ListView):
         return object_list
 
 
-class DaysToBirthdayResultsView(generic.ListView):
-    '''Take number of days from input form and generate list of searched contacts with birthday in needed date.'''
+class DaysToBirthdayResultsView(LoginRequiredMixin, generic.ListView):
+    '''Take number of days from input form and generate list of searched contacts
+    with birthday in needed date.'''
 
     model = Contact
-    
- 
-    def get_queryset(self): 
+
+    def get_queryset(self):
         '''Take query and return suitable queryset'''
         query = self.request.GET.get('q1')
         today = datetime.now().date()
@@ -98,6 +109,6 @@ class DaysToBirthdayResultsView(generic.ListView):
         needed_str = needed.strftime("%m-%d")
 
         object_list = Contact.objects.all()
-        res_list = object_list.filter(birthday__contains= needed_str)
-        
+        res_list = object_list.filter(birthday__contains=needed_str)
+
         return res_list

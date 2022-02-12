@@ -1,7 +1,7 @@
 import email
 from django.db import models
 from django.urls import reverse
-
+from django.contrib.auth.models import User
 
 
 class Contact(models.Model):
@@ -13,17 +13,14 @@ class Contact(models.Model):
     email = models.EmailField(null=True)
     phone = models.CharField(max_length=12)
     birthday = models.DateField(null=True)
-    #'name', 'address', 'email', 'phone', 'birthday'
-
+    author = models.ForeignKey(User, on_delete=models.CASCADE, null=True)  # author is taken from authenticated user
 
     def __str__(self):
         return f'{self.name} has number {self.phone}'
 
-    
     def get_absolute_url(self):
         '''Return absolute url to each contacts information'''
-        return reverse('contact-detail', args= [str(self.id)])
+        return reverse('contact-detail', args=[str(self.id)])
 
-    
     class Meta:
         ordering = ['name']
